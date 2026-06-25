@@ -3,6 +3,9 @@ name: Python Publish
 on:
   workflow_call:
 
+permissions:
+  id-token: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -34,11 +37,11 @@ jobs:
           name: dist
           path: dist/
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v8.2.0
-
       - name: Publish to TestPyPI
-        run: uv publish --publish-url https://test.pypi.org/legacy/ --trusted-publishing always
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
 
   publish-pypi:
     needs: publish-testpypi
@@ -53,8 +56,5 @@ jobs:
           name: dist
           path: dist/
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v8.2.0
-
       - name: Publish to PyPI
-        run: uv publish --trusted-publishing always
+        uses: pypa/gh-action-pypi-publish@release/v1
