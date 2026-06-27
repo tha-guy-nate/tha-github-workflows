@@ -1,0 +1,47 @@
+name: Auto Tag on Version Bump
+
+on:
+  workflow_call:
+    secrets:
+      RELEASE_TOKEN:
+        required: true
+
+jobs:
+  auto-tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Detect version bump and push tag
+        run: |
+          NEW=$(grep '^version' pyproject.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          OLD=$(git show HEAD~1:pyproject.toml 2>/dev/null | grep '^version' | head -1 | sed 's/version = "\(.*\)"/\1/' || echo "")
+
+          if [ -z "$NEW" ]; then
+            echo "Could not extract version from pyproject.toml, skipping"
+            exit 0
+          fi
+
+          if [ "$NEW" = "$OLD" ]; then
+            echo "Version unchanged ($NEW), skipping tag"
+            exit 0
+          fi
+
+          TAG="v$NEW"
+          echo "Version bumped $OLD -> $NEW"
+
+          if git ls-remote --tags origin "$TAG" | grep -q "$TAG"; then
+            echo "Tag $TAG already exists, skipping"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$TAG"
+          git push origin "$TAG"
+          echo "Created and pushed tag $TAG — publish workflow will trigger"
