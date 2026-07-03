@@ -37,13 +37,16 @@ jobs:
         run: uv run ruff format --check src/ tests/
 
       - name: Test
-        run: uv run pytest
+        run: uv run pytest --cov=src --cov-report=term-missing
 
       - name: Type check
         run: uv run mypy src/
 
       - name: Dependency check
         run: uv run deptry .
+
+      - name: Vulnerability check
+        run: uv run pip-audit
 
       - name: Build
         run: uv build
