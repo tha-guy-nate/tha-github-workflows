@@ -42,5 +42,8 @@ jobs:
       - name: Type check
         run: uv run mypy src/
 
+      - name: Dependency check
+        run: uv run deptry .
+
       - name: Build
         run: uv build
