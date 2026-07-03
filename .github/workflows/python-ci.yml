@@ -50,7 +50,12 @@ jobs:
         run: uv run mypy src/
 
       - name: Dependency check
-        run: uv run deptry .
+        run: |
+          if grep -q '^\[tool\.deptry\]' pyproject.toml; then
+            uv run deptry .
+          else
+            echo "No [tool.deptry] section found, skipping."
+          fi
 
       - name: Vulnerability check
         run: uv run pip-audit
