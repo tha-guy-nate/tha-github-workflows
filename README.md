@@ -47,3 +47,26 @@ jobs:
 7. `pytest` — tests
 8. `mypy` — type check
 9. `uv build` — build distribution
+
+### `check-yanked-floors.yml`
+
+Scans this repo's `tha-*>=X.Y.Z` (and `tha-*[extra]>=X.Y.Z`) dependency floors against PyPI's per-release `yanked` status. Opens or updates a single tracking issue titled "Yanked dependency floor(s) detected" on the calling repo when a floor points at a yanked release; auto-closes it once resolved.
+
+PyPI has no public API to yank a release programmatically (web UI only, CSRF-protected) — this covers detection and notification, not the yank action itself.
+
+#### Usage
+
+In `.github/workflows/yanked-floor-check.yml`:
+
+```yaml
+name: Yanked Floor Check
+on:
+  schedule:
+    - cron: '30 9 * * *'
+  workflow_dispatch:
+jobs:
+  check:
+    permissions:
+      issues: write
+    uses: tha-guy-nate/tha-github-workflows/.github/workflows/check-yanked-floors.yml@main
+```
