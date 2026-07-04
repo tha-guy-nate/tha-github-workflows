@@ -1,0 +1,89 @@
+name: Check Yanked Dependency Floors
+
+on:
+  workflow_call:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Scan dependency floors for yanked PyPI releases
+        id: check
+        run: |
+          python3 - <<'PYEOF'
+          import re, json, os, sys
+          from urllib.request import urlopen
+
+          with open("pyproject.toml") as f:
+              content = f.read()
+
+          pattern = re.compile(r'"(tha-[a-z-]+)(\[[a-z, ]+\])?>=([\d]+\.[\d]+\.[\d]+)"')
+          findings = []
+          for pkg, extra, floor in pattern.findall(content):
+              extra = extra or ""
+              try:
+                  with urlopen(f"https://pypi.org/pypi/{pkg}/{floor}/json", timeout=10) as r:
+                      info = json.load(r)["info"]
+              except Exception as e:
+                  print(f"  {pkg}{extra}>={floor} -- PyPI lookup failed ({e})")
+                  continue
+
+              if info.get("yanked"):
+                  reason = info.get("yanked_reason") or "(no reason given)"
+                  findings.append((pkg, extra, floor, reason))
+                  print(f"  YANKED: {pkg}{extra}>={floor} -- {reason}")
+              else:
+                  print(f"  ok: {pkg}{extra}>={floor}")
+
+          gho = os.environ["GITHUB_OUTPUT"]
+          if not findings:
+              print("No yanked dependency floors found.")
+              with open(gho, "a") as f:
+                  f.write("found=false\n")
+              sys.exit(0)
+
+          lines = [
+              f"- `{pkg}{extra}>={floor}` is **yanked** on PyPI: {reason}"
+              for pkg, extra, floor, reason in findings
+          ]
+          body = (
+              "Automated scan found dependency floor(s) in this repo's `pyproject.toml` "
+              "pointing at a yanked PyPI release.\n\n"
+              + "\n".join(lines)
+              + "\n\nBump the floor(s) to a non-yanked version.\n"
+          )
+          with open("/tmp/issue_body.txt", "w") as f:
+              f.write(body)
+          with open(gho, "a") as f:
+              f.write("found=true\n")
+          PYEOF
+
+      - name: Open or update tracking issue
+        if: steps.check.outputs.found == 'true'
+        run: |
+          TITLE="Yanked dependency floor(s) detected"
+          EXISTING=$(gh issue list --search "$TITLE in:title" --state open --json number --jq '.[0].number')
+          if [ -z "$EXISTING" ]; then
+            gh issue create --title "$TITLE" --body-file /tmp/issue_body.txt
+          else
+            gh issue edit "$EXISTING" --body-file /tmp/issue_body.txt
+            gh issue comment "$EXISTING" --body "Re-scanned $(date -u +%Y-%m-%d) -- still detected, issue body updated above."
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Close resolved tracking issue
+        if: steps.check.outputs.found == 'false'
+        run: |
+          TITLE="Yanked dependency floor(s) detected"
+          EXISTING=$(gh issue list --search "$TITLE in:title" --state open --json number --jq '.[0].number')
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "Re-scanned $(date -u +%Y-%m-%d) -- no yanked floors found, closing."
+            gh issue close "$EXISTING"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
