@@ -90,39 +90,16 @@ jobs:
     uses: tha-guy-nate/tha-github-workflows/.github/workflows/pre-commit.yml@main
 ```
 
-### `python-publish.yml`
+### Why `publish.yml` is NOT centralized here
 
-Builds the package, publishes to TestPyPI then PyPI (gated by `testpypi`/`pypi` environments), creates a GitHub Release from the matching `CHANGELOG.md` section, and notifies `tha-wright-stuff` via `repository_dispatch` so its dep-floor bump can pick up the new version. The package name is read from `pyproject.toml`, so no per-repo configuration is needed — the `notify-wright-stuff` job is automatically skipped when the package is `tha-wright-stuff` itself.
+This was tried (2026-07-05) and reverted after a real release test (`tha-map-runner` v0.2.12) failed: **PyPI's Trusted Publishing (OIDC) does not support reusable/`workflow_call` workflows.** The OIDC token's `job_workflow_ref` claim points at the reusable workflow's path instead of the calling repo's own `publish.yml`, so PyPI's Trusted Publisher match fails with `invalid-publisher`:
 
-#### Usage
-
-In `.github/workflows/publish.yml`, triggered by the tag `python-auto-tag.yml` pushes:
-
-```yaml
-name: Publish
-on:
-  push:
-    tags:
-      - "v*"
-
-jobs:
-  publish:
-    permissions:
-      id-token: write
-      contents: write
-    uses: tha-guy-nate/tha-github-workflows/.github/workflows/python-publish.yml@main
-    secrets: inherit
+```
+The claims in this token suggest that the calling workflow is a reusable workflow... Reusable workflows are
+not currently supported by PyPI's Trusted Publishing functionality, and are subject to breakage.
 ```
 
-#### Secrets
-
-| Secret | Required | Description |
-|---|---|---|
-| `RELEASE_TOKEN` | only if not `tha-wright-stuff` | PAT with `Contents: write`, used to dispatch the `tha-lib-published` event to `tha-wright-stuff` |
-
-#### Environments
-
-Each calling repo must have `testpypi` and `pypi` GitHub environments configured with the reviewer gate (see the family's PyPI publishing conventions).
+See [pypa/gh-action-pypi-publish#166](https://github.com/pypa/gh-action-pypi-publish/issues/166). This is a hard platform limitation, not a config mistake — every repo's `publish.yml` must stay a standalone file with its own `build`/`publish-testpypi`/`publish-pypi`/`create-release`/`notify-wright-stuff` jobs. Don't re-attempt this without checking whether PyPI has added reusable-workflow support first.
 
 ### `auto-assign-pr.yml`
 
