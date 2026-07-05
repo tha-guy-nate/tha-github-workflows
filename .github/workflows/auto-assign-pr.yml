@@ -12,9 +12,23 @@ jobs:
       - uses: actions/github-script@v7
         with:
           script: |
-            await github.rest.issues.addAssignees({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              assignees: ['tha-guy-nate']
-            });
+            const author = context.payload.pull_request.user.login;
+            const isBot = author.endsWith('[bot]');
+
+            if (!isBot) {
+              await github.rest.issues.addAssignees({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                assignees: [author],
+              });
+            }
+
+            if (author !== 'tha-guy-nate') {
+              await github.rest.pulls.requestReviewers({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                reviewers: ['tha-guy-nate'],
+              });
+            }
