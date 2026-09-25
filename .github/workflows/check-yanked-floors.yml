@@ -21,7 +21,7 @@ jobs:
           with open("pyproject.toml") as f:
               content = f.read()
 
-          pattern = re.compile(r'"(tha-[a-z-]+)(\[[a-z, ]+\])?>=([\d]+\.[\d]+\.[\d]+)"')
+          pattern = re.compile(r'"(tha-[a-z-]+)(\[[a-z0-9, _-]+\])?(?:>=|==)([\d]+\.[\d]+\.[\d]+)"')
           findings = []
           for pkg, extra, floor in pattern.findall(content):
               extra = extra or ""
